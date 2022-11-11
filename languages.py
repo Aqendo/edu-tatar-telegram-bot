@@ -1,4 +1,5 @@
 from datetime import datetime
+
 strings = {
     "ru": {
         "language_applied": "<b>Ваш язык успешно сохранён, изменить вы его сможете в настройках.</b>",
@@ -12,13 +13,17 @@ strings = {
                                         "Введите ваш **логин** от edu.tatar.ru",
         "choose_option": "<b>Выберите действие:</b>",
         "daily_grades": "Оценки за день",
-        "quarter_grades": "Оценки за четверть"
+        "quarter_grades": "Оценки за четверть",
+        "first_quarter": "1-ая четверть",
+        "second_quarter": "2-ая четверть",
+        "third_quarter": "3-ая четверть",
+        "fourth_quarter": "4-ая четверть",
+        "year": "Год",
     },
     "tr": {
 
     }
 }
-
 
 
 

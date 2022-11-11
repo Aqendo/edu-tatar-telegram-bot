@@ -139,3 +139,27 @@ class EduTatarParser:
                 tds_of_itog = trs[-1].find_all("td")
                 result += "Итого {%s} [%s]" % (tds_of_itog[-3].text, tds_of_itog[-1].text)
                 return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (DNSID if changed else None)
+
+    async def getYear(self, login, password, DNSID="", changed=False):
+        async with aiohttp.ClientSession(headers=self._headers, cookies={"DNSID": DNSID}) as session:
+            async with session.post("https://edu.tatar.ru/user/diary/term", params={"term": "year"}) as response:
+                response_text = await response.text()
+                if "apastovo" in response_text:  # some kind of "indicator" for /logon page
+                    DNSID = await self.get_DNSID(login, password)
+                    if DNSID is None:
+                        return None
+                    return await self.getYear(login=login, password=password, DNSID=DNSID, changed=True)
+                bs4 = BeautifulSoup(response_text, "lxml")
+                tbody = bs4.find("table", class_="table").tbody
+                trs = tbody.find_all("tr")
+                result = ""
+                for tr in trs:
+                    tds = tr.find_all("td")
+                    result += "%s: %s\n" % (
+                        tds[0].text.strip(),
+                        "".join(
+                            [i.text.strip() for i in tds[1:-1]]
+                        )
+                    )
+                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (DNSID if changed else None)
+
