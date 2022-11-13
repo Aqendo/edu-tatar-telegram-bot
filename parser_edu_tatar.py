@@ -7,6 +7,32 @@ from datetime import datetime
 import logging
 
 
+def get_count_of_five_to_the_next_mark(score: str, rounding_rule: int, grades: str):
+    # score = 5.00
+    if score == "" or grades == "":
+        return ""
+    score_float = float(score)
+    if score_float >= 4+rounding_rule/100:
+        return "(+0)"
+    elif round(score_float%1, 2)*100 < rounding_rule:
+        grades = [int(i) for i in list(grades)]
+        count_added = 0
+        while round(sum(grades)/len(grades) %1, 2)*100 < rounding_rule:
+            print(round(sum(grades)/len(grades) %1, 2), grades)
+            grades.append(5)
+            count_added += 1
+        return f"(+{count_added})"
+    elif round(score_float%1, 2)*100 >= rounding_rule:
+        grades = [int(i) for i in list(grades)]
+        count_added = 0
+        next_mark = int(score[0])+1
+        while round(sum(grades)/len(grades), 2) < next_mark+round(rounding_rule/100, 2):
+            grades.append(5)
+            count_added += 1
+        return f"(+{count_added})"
+
+
+
 class EduTatarParser:
     _backslash = "\n" # I CAN'T UNDERSTAND WHY PYTHON HAS A REGEX JUST TO NOT HAVE \ IN THE FSTRING
     _regexDays = re.compile(r"day\?for=(\d+)")
@@ -114,7 +140,7 @@ class EduTatarParser:
                 return result, (DNSID if changed else None), dates[0], dates[1]
 
     async def getTerm(
-        self, login, password, termNum=1, DNSID="", changed=False, date=time.time()
+        self, login, password, termNum=1, DNSID="", changed=False, date=time.time(), rounding_rule: int = 50
     ) -> typing.Union[typing.Tuple[str, typing.Union[str, None]], None]:
         result = ""
         async with aiohttp.ClientSession(headers=self._headers, cookies={"DNSID": DNSID}) as session:
@@ -130,10 +156,12 @@ class EduTatarParser:
                 trs = tbody.find_all("tr")
                 for tr in trs[:-1]:
                     tds = tr.find_all("td")
-                    result += "%s: %s - %s%s\n" % (
+                    grades = "".join([i.text for i in tds[1:-3]])
+                    result += "%s: %s - %s%s%s\n" % (
                         tds[0].text,
-                        "".join([i.text for i in tds[1:-3]]),
+                        grades,
                         tds[-3].text,
+                        get_count_of_five_to_the_next_mark(score=tds[-3].text, rounding_rule=rounding_rule, grades=grades),
                         (f"[{tds[-1].text.lstrip(self._backslash).lstrip()}]" if tds[-1].text != "\n" else ""),
                     )
                 tds_of_itog = trs[-1].find_all("td")

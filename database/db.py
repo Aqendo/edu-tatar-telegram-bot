@@ -3,6 +3,8 @@ import aiosqlite
 import os
 import logging
 
+logging.basicConfig(level=logging.DEBUG)
+
 
 class DataBase:
     _states = {}
@@ -13,15 +15,16 @@ class DataBase:
             sqlite_connection = sqlite3.connect(self._dbname)
             create_table_info = """CREATE TABLE info  
             ( 
-              userid       INTEGER PRIMARY KEY, 
-              login        TEXT, 
-              password     TEXT 
+              userid        INTEGER PRIMARY KEY, 
+              login         TEXT, 
+              password      TEXT
             );"""
 
             create_table_settings = """CREATE TABLE settings  
             ( 
-              userid       INTEGER PRIMARY KEY, 
-              language        TEXT
+              userid          INTEGER PRIMARY KEY, 
+              language        TEXT,
+              rounding_rule INTEGER DEFAULT 50 NOT NULL
             )"""
             cursor = sqlite_connection.cursor()
             cursor.execute(create_table_info)
@@ -80,6 +83,24 @@ class DataBase:
                 self._states[userid]["language"] = language[0][0]
                 return language[0][0]
 
+    async def get_rounding_rule(self, userid):
+        if userid not in self._states:
+            self._states[userid] = {}
+        elif "rounding_rule" not in self._states[userid]:
+            pass
+        else:
+            return self._states[userid]["rounding_rule"]
+        async with aiosqlite.connect(self._dbname) as db:
+            select_query = """
+                SELECT rounding_rule from settings where userid=?;
+            """
+            async with db.execute(select_query, (userid,)) as cursor:
+                rounding_rule = await cursor.fetchall()
+                if len(rounding_rule) == 0:
+                    return None
+                self._states[userid]["rounding_rule"] = rounding_rule[0][0]
+                return rounding_rule[0][0]
+
     async def set_login_and_password(self, userid, login, password):
         if userid not in self._states:
             self._states[userid] = {}
@@ -93,12 +114,26 @@ class DataBase:
             await db.commit()
 
     async def set_language(self, userid, language):
+        if language is None:
+            raise ValueError("why is it None")
         if userid not in self._states:
             self._states[userid] = {}
         self._states[userid]["language"] = language
         select_query = """
-            INSERT OR REPLACE INTO settings (userid, language) VALUES (?,?);
+            INSERT OR REPLACE INTO settings (userid, language, rounding_rule) VALUES (?,?, (SELECT rounding_rule FROM settings WHERE userid=?));
         """
         async with aiosqlite.connect(self._dbname) as db:
-            await db.execute(select_query, (userid, language))
+            print("SAVED:", userid, language)
+            await db.execute(select_query, (userid, language, userid))
+            await db.commit()
+
+    async def set_rounding_rule(self, userid, rounding_rule):
+        if userid not in self._states:
+            self._states[userid] = {}
+        self._states[userid]["rounding_rule"] = rounding_rule
+        select_query = """
+            INSERT OR REPLACE INTO settings (userid, language, rounding_rule) VALUES (?,(SELECT language FROM settings WHERE userid=?),?);
+        """
+        async with aiosqlite.connect(self._dbname) as db:
+            await db.execute(select_query, (userid, userid, rounding_rule))
             await db.commit()
