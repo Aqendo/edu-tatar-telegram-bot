@@ -113,6 +113,21 @@ class DataBase:
             await db.execute(select_query, (userid, login, password))
             await db.commit()
 
+    async def delete_login_and_password(self, userid):
+        if userid in self._states:
+            if "login" in self._states[userid]:
+                del self._states[userid]["login"]
+            if "password" in self._states[userid]:
+                del self._states[userid]["password"]
+            if "DNSID" in self._states[userid]:
+                del self._states[userid]["DNSID"]
+        delete_query = """
+            DELETE from info where userid=?;
+        """
+        async with aiosqlite.connect(self._dbname) as db:
+            await db.execute(delete_query, (userid, ))
+            await db.commit()
+
     async def set_language(self, userid, language):
         if language is None:
             raise ValueError("why is it None")

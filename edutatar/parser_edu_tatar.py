@@ -5,12 +5,14 @@ import re
 import aiohttp
 from datetime import datetime
 import logging
-
+import pprint
 
 def get_count_of_five_to_the_next_mark(score: str, rounding_rule: int, grades: str):
-    # score = 5.00
     if score == "" or grades == "":
         return ""
+    pprint.pprint(score)
+    pprint.pprint(rounding_rule)
+    pprint.pprint(grades)
     score_float = float(score)
     if score_float >= 4+rounding_rule/100:
         return "(+0)"
@@ -94,7 +96,6 @@ class EduTatarParser:
         try:
             async with self.session.post("https://edu.tatar.ru/logon", data=data) as response:
                 text = await response.text()
-                print(text)
                 if "Мой дневник" in text:
                     print(response.cookies)
                     return response.cookies["DNSID"]
@@ -150,7 +151,7 @@ class EduTatarParser:
                     DNSID = await self.get_DNSID(login, password)
                     if DNSID is None:
                         return None
-                    return await self.getTerm(login=login, password=password, termNum=termNum, DNSID=DNSID, changed=True)
+                    return await self.getTerm(login=login, password=password, termNum=termNum, DNSID=DNSID, changed=True, rounding_rule=rounding_rule)
                 bs4 = BeautifulSoup(responseText, "lxml")
                 tbody = bs4.find("table", class_="term-marks").tbody
                 trs = tbody.find_all("tr")
