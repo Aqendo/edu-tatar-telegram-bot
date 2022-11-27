@@ -194,19 +194,3 @@ class DataBase:
             rounding_rule_object.language = rounding_rule
             self.async_session.add(rounding_rule_object)
             await self.async_session.commit()
-
-async def main():
-    base = DataBase()
-    await base.initialize()
-    print("ANSWER", await base.set_language(123, "ru"))
-    print("ANSWER", await base.set_login_and_password(123, "123123", "543"))
-    print("ANSWER", await base.set_rounding_rule(123, 90))
-    base._states = {}
-    print("lANGNAGAG", await base.get_language(123))
-    
-if __name__=="__main__":
-    asyncio.run(main())
-    # print("LOGINSDFIGFIDS", asyncio.run(base.get_login_and_password(123)))
-    # print("ROUNDSIF", asyncio.run(base.get_rounding_rule(123)))
-
-    #print(asyncio.run(base.get_login_and_password(123)))
