@@ -1,17 +1,19 @@
-from bot import types
+from bot import types, Bot
+from bot.module_logic import BaseModule
 from .database import DataBase
 from .parser_edu_tatar import EduTatarParser
 from .languages import get_text
 import logging
 from dotenv import load_dotenv, find_dotenv
 from os import getenv
+import asyncio
 
-
-class EduTatarModule(types.BaseModule):
-    def __init__(self, bot):
+class EduTatarModule(BaseModule):
+    def __init__(self, bot: Bot):
         super().__init__(bot)
         load_dotenv(find_dotenv())
         self.db = DataBase(getenv("DB_PATH", "db.db"))
+        asyncio.shield(self.db.initialize())
         self.parser = EduTatarParser()
         logging.basicConfig(level=logging.DEBUG)
         self.change = {
@@ -40,7 +42,7 @@ class EduTatarModule(types.BaseModule):
                 ]
             ]
         }
-
+    
     async def get_settings_markup(self, user_id: int, language: str):
         return {
             "inline_keyboard": [
@@ -351,7 +353,7 @@ class EduTatarModule(types.BaseModule):
                                                  }
                                              ]]
                                          })
-        self.db.set_value(update.from_user.id, "message_language", message.message_id)
+        self.db.set_value(update.from_user.id, "message_language", update.message_id)
 
     async def are_you_sure(self, user_id, language, update):
         await self.bot.edit_message_text(chat_id=user_id, message_id=update.message.message_id,
@@ -410,7 +412,8 @@ class EduTatarModule(types.BaseModule):
         elif update.data == "change_rounding":
             await self.send_message_change_rounding(user_id, language, update)
         elif update.data == "copy":
-            await self.bot.send_message(user_id, update.message.text)
+            print(update.message.entities)
+            await self.bot.send_message(user_id, update.message.text, entities=update.message.entities)
         elif update.data == "back":
             await self.go_back_callback(user_id, language, update)
         elif update.data == "sureDeleteInfo":
