@@ -1,0 +1,3 @@
+[submodule "bot"]
+	path = bot
+	url = git@codeberg.org:aqendo/telegram-bot-library.git
