@@ -23,8 +23,9 @@ class Info(Based):
 class Settings(Based):
     __tablename__ = 'settings'
     user_id = mapped_column(Integer(), primary_key=True)
-    language = mapped_column(String())
-    rounding_rule = mapped_column(Integer())
+    language = mapped_column(String(), default="ru")
+    rounding_rule = mapped_column(Integer(), default=50)
+    quarter = mapped_column(Integer(), default=1)
 
 
 
@@ -88,7 +89,7 @@ class DataBase:
         result = result.fetchone()
         if result is None:
             return None
-        print(result)
+        logging.debug(result)
         return result[0].login, result[0].password
     
     async def get_language(self, userid):
@@ -105,6 +106,7 @@ class DataBase:
             return None
         result.close()
         self._states[userid]["language"] = settings_object[0].language
+        logging.debug(settings_object[0].language)
         return settings_object[0].language
 
     async def get_rounding_rule(self, userid):
@@ -125,6 +127,22 @@ class DataBase:
         self._states[userid]["rounding_rule"] = rounding_rule[0].rounding_rule
         result.close()
         return rounding_rule[0].rounding_rule
+    
+    async def get_quarter(self, userid):
+        logging.debug("GETQUARTER")
+        if userid not in self._states:
+            self._states[userid] = {}
+        elif "quarter" not in self._states[userid]:
+            pass
+        else:
+            return self._states[userid]["quarter"]
+        result = await self.async_session.execute(select(Settings).filter_by(user_id=userid))
+        quarter = result.fetchone()
+        if quarter is None:
+            return None
+        self._states[userid]["quarter"] = quarter[0].quarter
+        result.close()
+        return quarter[0].quarter
 
     async def set_login_and_password(self, userid, login, password):
         if userid not in self._states:
@@ -157,8 +175,7 @@ class DataBase:
         await self.async_session.commit()
 
     async def set_language(self, userid, language):
-        if language is None:
-            raise ValueError("why is it None")
+        logging.debug("LANGUAGE SET")
         if userid not in self._states:
             self._states[userid] = {}
         self._states[userid]["language"] = language
@@ -191,6 +208,23 @@ class DataBase:
             await self.async_session.commit()
         else:
             rounding_rule_object = rounding_rule_object[0]
-            rounding_rule_object.language = rounding_rule
+            rounding_rule_object.rounding_rule = rounding_rule
             self.async_session.add(rounding_rule_object)
             await self.async_session.commit()
+
+    async def set_quarter(self, userid, quarter):
+        if userid not in self._states:
+            self._states[userid] = {}
+        self._states[userid]["quarter"] = quarter
+        result = await self.async_session.execute(select(Settings).filter_by(user_id=userid))
+        quarterobject = result.fetchone()
+        if quarterobject is None:
+            self.async_session.add(Settings(user_id=userid, quarter=quarter))
+            await self.async_session.commit()
+        else:
+            quarterobject = quarterobject[0]
+            quarterobject.quarter = quarter
+            self.async_session.add(quarterobject)
+            await self.async_session.commit()
+        self._states[userid]["quarter"] = quarter
+

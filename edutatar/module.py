@@ -44,6 +44,7 @@ class EduTatarModule(BaseModule):
         }
     
     async def get_settings_markup(self, user_id: int, language: str):
+        quarter = await self.db.get_quarter(user_id)
         return {
             "inline_keyboard": [
                 [
@@ -60,6 +61,14 @@ class EduTatarModule(BaseModule):
                             get_text(language, "rounding_rule"), await self.db.get_rounding_rule(user_id)
                         ),
                         "callback_data": "change_rounding"
+                    }
+                ],
+                [
+                    {
+                        "text": "%s: %s" % (
+                            get_text(language, "quarter"), await self.db.get_quarter(user_id)
+                        ),
+                        "callback_data": "changeQuarter" + str(quarter+1 if quarter !=4 else 1)
                     }
                 ],
                 [
@@ -107,6 +116,7 @@ class EduTatarModule(BaseModule):
     async def show_daily_grades(self, user_id: int, language: str, update: types.CallbackQuery):
         login_and_password = await self.db.get_login_and_password(user_id)
         if login_and_password is None:
+            """Should be unreachable state"""
             await self.bot.send_message(chat_id=update.from_user.id,
                                    text="Something went wrong. We apologise.")  # TODO: do not do like that hehe
             return
@@ -138,13 +148,14 @@ class EduTatarModule(BaseModule):
     async def show_quarter_grades(self, user_id: int, language: str, update: types.CallbackQuery):
         login_and_password = await self.db.get_login_and_password(user_id)
         rounding_rule = await self.db.get_rounding_rule(user_id)
-        print("GOT ROUNDING RULE:", rounding_rule)
+        quarter = await self.db.get_quarter(user_id)
+        logging.debug(f"GOT ROUNDING RULE: {rounding_rule}")
         if login_and_password is None:
             await self.bot.send_message(chat_id=update.from_user.id,
                                    text="Something went wrong. We apologise.")  # TODO: i shouldn't do that, but i don't know the case when it can be
             return
         result, DNSID = await self.parser.getTerm(login_and_password[0], login_and_password[1],
-                                             termNum=1, DNSID=self.db.get_value(user_id, "DNSID"), rounding_rule=rounding_rule)
+                                             termNum=quarter, DNSID=self.db.get_value(user_id, "DNSID"), rounding_rule=rounding_rule)
         if DNSID is not None:
             self.db.set_value(user_id, "DNSID", DNSID)
         await self.bot.edit_message_text(chat_id=user_id, message_id=update.message.message_id, text=result, reply_markup={
@@ -370,7 +381,17 @@ class EduTatarModule(BaseModule):
                                                  }
                                              ]]
                                          })
-
+    async def update_default_quarter(self, user_id, language, update: types.CallbackQuery):
+        logging.debug(f"QUARTER NOW: {int(update.data[-1])}")
+        await self.db.set_quarter(user_id, int(update.data[-1]))
+        language = await self.db.get_language(user_id)
+        await self.bot.edit_message_text(
+            chat_id=user_id,
+            message_id=update.message.message_id,
+            text=get_text(language, "here_you_can_change_settings"),
+            reply_markup=await self.get_settings_markup(user_id, language)
+        )
+    
     async def delete_info(self, user_id, language, update):
         await self.db.delete_login_and_password(user_id)
         await self.bot.send_message(chat_id=update.from_user.id,
@@ -403,6 +424,8 @@ class EduTatarModule(BaseModule):
             await self.show_quarter_grades(user_id, language, update)
         elif update.data in ('1', '2', '3', '4'):
             await self.update_quarter_grades(user_id, language, update)
+        elif "changeQuarter" in update.data:
+            await self.update_default_quarter(user_id, language, update)
         elif update.data == "year":
             await self.show_year_grades(user_id, language, update)
         elif update.data == "settings":
@@ -412,7 +435,7 @@ class EduTatarModule(BaseModule):
         elif update.data == "change_rounding":
             await self.send_message_change_rounding(user_id, language, update)
         elif update.data == "copy":
-            print(update.message.entities)
+            logging.debug(update.message.entities)
             await self.bot.send_message(user_id, update.message.text, entities=update.message.entities)
         elif update.data == "back":
             await self.go_back_callback(user_id, language, update)
@@ -433,6 +456,7 @@ class EduTatarModule(BaseModule):
         state = self.db.get_value(user_id, "state")
         language = await self.db.get_language(user_id)
         login_and_password = await self.db.get_login_and_password(user_id)
+        logging.debug(f"{state}{language}{login_and_password}")
         if state is None:
             if language is not None:
                 if login_and_password is not None:
