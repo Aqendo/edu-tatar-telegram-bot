@@ -4,10 +4,17 @@ import time
 import traceback
 import typing
 from datetime import datetime
-
+from dotenv import load_dotenv, find_dotenv
 import aiohttp
 from bs4 import BeautifulSoup
 from .languages import get_text
+from os import getenv
+
+load_dotenv(find_dotenv())
+if getenv("PROXY", "") == "":
+    proxy = ""
+else:
+    proxy = getenv("PROXY", "")
 
 
 class EduTatarParser:
@@ -112,7 +119,7 @@ class EduTatarParser:
         try:
             async with aiohttp.ClientSession(headers=self._headers) as session:
                 async with session.post(
-                    "https://edu.tatar.ru/logon", data=data
+                    "https://edu.tatar.ru/logon", data=data, proxy=proxy
                 ) as response:
                     text = await response.text()
                     if "Мой дневник" in text:
@@ -142,6 +149,7 @@ class EduTatarParser:
             async with session.post(
                 "https://edu.tatar.ru/user/diary/day",
                 params={"for": str(date)},
+                proxy=proxy,
             ) as response:
                 response_text = await response.text()
                 if (
@@ -203,6 +211,7 @@ class EduTatarParser:
             async with session.post(
                 "https://edu.tatar.ru/user/diary/term",
                 params={"term": str(termNum)},
+                proxy=proxy,
             ) as response:
                 responseText = await response.text()
                 if (
@@ -251,7 +260,9 @@ class EduTatarParser:
             headers=self._headers, cookies={"DNSID": DNSID}
         ) as session:
             async with session.post(
-                "https://edu.tatar.ru/user/diary/term", params={"term": "year"}
+                "https://edu.tatar.ru/user/diary/term",
+                params={"term": "year"},
+                proxy=proxy,
             ) as response:
                 response_text = await response.text()
                 if (
