@@ -1,46 +1,22 @@
-import typing
-import time
-from bs4 import BeautifulSoup
-import re
-import aiohttp
-from datetime import datetime
 import logging
-import pprint
+import re
+import time
+import traceback
+import typing
+from datetime import datetime
 
-def get_count_of_five_to_the_next_mark(score: str, rounding_rule: int, grades: str):
-    if score == "" or grades == "":
-        return ""
-    pprint.pprint(score)
-    pprint.pprint(rounding_rule)
-    pprint.pprint(grades)
-    score_float = float(score)
-    if score_float >= 4+rounding_rule/100:
-        return "(+0)"
-    elif round(score_float%1, 2)*100 < rounding_rule:
-        grades = [int(i) for i in list(grades)]
-        count_added = 0
-        while round(sum(grades)/len(grades) %1, 2)*100 < rounding_rule:
-            print(round(sum(grades)/len(grades) %1, 2), grades)
-            grades.append(5)
-            count_added += 1
-        return f"(+{count_added})"
-    elif round(score_float%1, 2)*100 >= rounding_rule:
-        grades = [int(i) for i in list(grades)]
-        count_added = 0
-        next_mark = int(score[0])+1
-        while round(sum(grades)/len(grades), 2) < next_mark+round(rounding_rule/100, 2):
-            grades.append(5)
-            count_added += 1
-        return f"(+{count_added})"
-
+import aiohttp
+from bs4 import BeautifulSoup
+from .languages import get_text
 
 
 class EduTatarParser:
-    _backslash = "\n" # I CAN'T UNDERSTAND WHY PYTHON HAS A REGEX JUST TO NOT HAVE \ IN THE FSTRING
+    # _backslash = "\n"  # WHY PYTHON HAS A REGEX TO NOT HAVE \ IN THE FSTRING
     _regexDays = re.compile(r"day\?for=(\d+)")
+    _logon_page_detector_word = "apastovo"
     _headers = {
-        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",  # noqa: E501
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",  # noqa: E501
         "Accept-Language": "en-US,en;q=0.5",
         "Origin": "https://edu.tatar.ru",
         "DNT": "1",
@@ -57,6 +33,7 @@ class EduTatarParser:
 
     def __init__(self):
         self.session = aiohttp.ClientSession(headers=self._headers)
+        self.logging = logging.getLogger(__name__)
 
     months = {
         "Янв": 1,
@@ -83,101 +60,212 @@ class EduTatarParser:
         {"ru": "Воскресенье", "tr": ""},
     ]
 
+    def get_count_of_five_to_the_next_mark(
+        self, score: str, rounding_rule: int, grades: str
+    ):
+        if score == "" or grades == "":
+            return ""
+        self.logging.debug(
+            "Score given: {}, Rounding rule given: {}, Grades given: {}".format(
+                score, rounding_rule, grades
+            )
+        )
+        score_float = float(score)
+        if score_float >= 4 + rounding_rule / 100:
+            return "(+0)"
+        elif round(score_float % 1, 2) * 100 < rounding_rule:
+            grades = [int(i) for i in list(grades)]
+            count_added = 0
+            while round(sum(grades) / len(grades) % 1, 2) * 100 < rounding_rule:
+                grades.append(5)
+                count_added += 1
+            return f"(+{count_added})"
+        elif round(score_float % 1, 2) * 100 >= rounding_rule:
+            grades = [int(i) for i in list(grades)]
+            count_added = 0
+            next_mark = int(score[0]) + 1
+            while round(sum(grades) / len(grades), 2) < next_mark + round(
+                rounding_rule / 100, 2
+            ):
+                grades.append(5)
+                count_added += 1
+            return f"(+{count_added})"
+
     def get_day_of_week(self, language: str, string: str):
         string = string.split(" ")
-        return self.days_of_the_week[datetime.weekday(datetime(int(string[2]), int(self.months[string[1][0:3]]), int(string[0])))][language]
+        return self.days_of_the_week[
+            datetime.weekday(
+                datetime(
+                    int(string[2]),
+                    int(self.months[string[1][0:3]]),
+                    int(string[0]),
+                )
+            )
+        ][language]
 
     async def get_DNSID(self, login, password):
         data = {
             "main_login2": login,
             "main_password2": password,
         }
-        print("login:", login, "\npassword", password)
+        print("Login: {}, password: {}".format(login, password))
         try:
-            async with self.session.post("https://edu.tatar.ru/logon", data=data) as response:
-                text = await response.text()
-                if "Мой дневник" in text:
-                    print(response.cookies)
-                    return response.cookies["DNSID"]
-                else:
-                    return None
-        except Exception as e:
-            print(e)
+            async with aiohttp.ClientSession(headers=self._headers) as session:
+                async with session.post(
+                    "https://edu.tatar.ru/logon", data=data
+                ) as response:
+                    text = await response.text()
+                    if "Мой дневник" in text:
+                        logging.info("Response cookies: {}".format(response.cookies))
+                        return response.cookies["DNSID"]
+                    else:
+                        return None
+        except Exception:
+            traceback.print_ext()
             return None
 
     async def getDay(
-        self, login, password, DNSID="", changed=False, date=time.time(), language: str="ru"
+        self,
+        login: str,
+        password: str,
+        DNSID: str = "",
+        changed: bool = False,
+        date: int = -1,
+        language: str = "ru",
     ) -> typing.Union[typing.Tuple[str, typing.Union[str, None], str, str], None]:
+        if date == -1:
+            date = time.time()
         result = ""
-        async with aiohttp.ClientSession(headers=self._headers, cookies={"DNSID": DNSID}) as session:
-            async with session.post("https://edu.tatar.ru/user/diary/day", params={"for": str(date)}) as response:
-                responseText = await response.text()
-                if "apastovo" in responseText:  # some kind of "indicator" for /logon page
+        async with aiohttp.ClientSession(
+            headers=self._headers, cookies={"DNSID": DNSID}
+        ) as session:
+            async with session.post(
+                "https://edu.tatar.ru/user/diary/day",
+                params={"for": str(date)},
+            ) as response:
+                response_text = await response.text()
+                if (
+                    self._logon_page_detector_word in response_text
+                ):  # some kind of "indicator" for /logon page
                     DNSID = await self.get_DNSID(login, password)
                     if DNSID is None:
                         return None
                     return await self.getDay(login, password, DNSID, True)
-                bs4 = BeautifulSoup(responseText, "lxml")
-                dates = re.findall(self._regexDays, responseText)
+                bs4 = BeautifulSoup(response_text, "lxml")
+                dates = re.findall(self._regexDays, response_text)
                 datee = bs4.find("td", class_="d-date").text.strip()
-                result += "<b>" + self.get_day_of_week(language, datee) + " - " + datee + "</b>\n-----------------------------------------------\n"
+                result += (
+                    "<b>"
+                    + self.get_day_of_week(language, datee)
+                    + " - "
+                    + datee
+                    + "</b>\n-----------------------------------------------\n"
+                )
                 tbody = bs4.find("table", class_="main").tbody
-                for tr in tbody.find_all("tr", style=lambda value: value and "text-align: center;" in value):
+                for tr in tbody.find_all(
+                    "tr",
+                    style=lambda value: value and "text-align: center;" in value,
+                ):
                     tds = tr.find_all("td")
-                    # print(tds)
                     result += "<b>" + tds[0].text + "</b>\n"
                     result += tds[1].text + ":\n"
                     result += "<code>" + tds[2].text.strip() + "</code>\n"
                     string_marks = ""
                     marks_tr = tds[4].tr
                     if marks_tr is not None:
-                        string_marks += "\nОценки: "
+                        string_marks += f"\n{get_text(language, 'marks')}: "
                         for i in marks_tr.find_all("td"):
                             string_marks += i.text + "/"
                         string_marks = string_marks.rstrip("/")
                     result = result.rstrip(" ").rstrip("\n")
-                    result += string_marks + "\n-----------------------------------------------\n"
-                result = result.rstrip("\n-----------------------------------------------\n")
+                    result += (
+                        string_marks
+                        + "\n-----------------------------------------------\n"
+                    )
+                result = result.rstrip(
+                    "\n-----------------------------------------------\n"
+                )
                 return result, (DNSID if changed else None), dates[0], dates[1]
 
     async def getTerm(
-        self, login, password, termNum=1, DNSID="", changed=False, date=time.time(), rounding_rule: int = 50
+        self,
+        login: str,
+        password: str,
+        termNum: int = 1,
+        DNSID: str = "",
+        changed: bool = False,
+        rounding_rule: int = 50,
     ) -> typing.Union[typing.Tuple[str, typing.Union[str, None]], None]:
         result = ""
-        async with aiohttp.ClientSession(headers=self._headers, cookies={"DNSID": DNSID}) as session:
-            async with session.post("https://edu.tatar.ru/user/diary/term", params={"term": str(termNum)}) as response:
+        async with aiohttp.ClientSession(
+            headers=self._headers, cookies={"DNSID": DNSID}
+        ) as session:
+            async with session.post(
+                "https://edu.tatar.ru/user/diary/term",
+                params={"term": str(termNum)},
+            ) as response:
                 responseText = await response.text()
-                if "apastovo" in responseText:  # some kind of "indicator" for /logon page
+                if (
+                    self._logon_page_detector_word in responseText
+                ):  # some kind of "indicator" for /logon page
                     DNSID = await self.get_DNSID(login, password)
                     if DNSID is None:
                         return None
-                    return await self.getTerm(login=login, password=password, termNum=termNum, DNSID=DNSID, changed=True, rounding_rule=rounding_rule)
+                    return await self.getTerm(
+                        login=login,
+                        password=password,
+                        termNum=termNum,
+                        DNSID=DNSID,
+                        changed=True,
+                        rounding_rule=rounding_rule,
+                    )
                 bs4 = BeautifulSoup(responseText, "lxml")
                 tbody = bs4.find("table", class_="term-marks").tbody
                 trs = tbody.find_all("tr")
                 for tr in trs[:-1]:
                     tds = tr.find_all("td")
                     grades = "".join([i.text for i in tds[1:-3]])
+                    itog_mark = tds[-1].text.removeprefix("\n").lstrip()
                     result += "%s: %s - %s%s%s\n" % (
                         tds[0].text,
                         grades,
                         tds[-3].text,
-                        get_count_of_five_to_the_next_mark(score=tds[-3].text, rounding_rule=rounding_rule, grades=grades),
-                        (f"[{tds[-1].text.lstrip(self._backslash).lstrip()}]" if tds[-1].text != "\n" else ""),
+                        self.get_count_of_five_to_the_next_mark(
+                            score=tds[-3].text,
+                            rounding_rule=rounding_rule,
+                            grades=grades,
+                        ),
+                        (f"[{itog_mark}]" if tds[-1].text != "\n" else ""),
                     )
                 tds_of_itog = trs[-1].find_all("td")
-                result += "Итого {%s} [%s]" % (tds_of_itog[-3].text, tds_of_itog[-1].text)
-                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (DNSID if changed else None)
+                result += "Итого {%s} [%s]" % (
+                    tds_of_itog[-3].text,
+                    tds_of_itog[-1].text,
+                )
+                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (
+                    DNSID if changed else None
+                )
 
     async def getYear(self, login, password, DNSID="", changed=False):
-        async with aiohttp.ClientSession(headers=self._headers, cookies={"DNSID": DNSID}) as session:
-            async with session.post("https://edu.tatar.ru/user/diary/term", params={"term": "year"}) as response:
+        async with aiohttp.ClientSession(
+            headers=self._headers, cookies={"DNSID": DNSID}
+        ) as session:
+            async with session.post(
+                "https://edu.tatar.ru/user/diary/term", params={"term": "year"}
+            ) as response:
                 response_text = await response.text()
-                if "apastovo" in response_text:  # some kind of "indicator" for /logon page
+                if (
+                    "apastovo" in response_text
+                ):  # some kind of "indicator" for /logon page
                     DNSID = await self.get_DNSID(login, password)
                     if DNSID is None:
                         return None
-                    return await self.getYear(login=login, password=password, DNSID=DNSID, changed=True)
+                    return await self.getYear(
+                        login=login,
+                        password=password,
+                        DNSID=DNSID,
+                        changed=True,
+                    )
                 bs4 = BeautifulSoup(response_text, "lxml")
                 tbody = bs4.find("table", class_="table").tbody
                 trs = tbody.find_all("tr")
@@ -186,9 +274,8 @@ class EduTatarParser:
                     tds = tr.find_all("td")
                     result += "%s: %s\n" % (
                         tds[0].text.strip(),
-                        "".join(
-                            [i.text.strip() for i in tds[1:-1]]
-                        )
+                        "".join([i.text.strip() for i in tds[1:-1]]),
                     )
-                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (DNSID if changed else None)
-
+                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (
+                    DNSID if changed else None
+                )

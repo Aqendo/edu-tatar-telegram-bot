@@ -1,49 +1,32 @@
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-import asyncio
-from sqlalchemy import Integer, insert
-from sqlalchemy import select
-from sqlalchemy import String
-from sqlalchemy.ext.asyncio import create_async_engine
-from sqlalchemy.orm import declarative_base
-from sqlalchemy.orm import mapped_column
-import sqlite3
-import aiosqlite
-import os
 import asyncio
 import logging
+from typing import Dict, Union
 
-logging.basicConfig(level=logging.DEBUG)
+from sqlalchemy import Integer, String, insert, select
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import declarative_base, mapped_column
+
+logging.basicConfig(level=logging.INFO)
 Based = declarative_base()
+
+
 class Info(Based):
-    __tablename__ = 'info'
+    __tablename__ = "info"
     user_id = mapped_column(Integer(), primary_key=True)
     login = mapped_column(String())
     password = mapped_column(String())
-    
+
+
 class Settings(Based):
-    __tablename__ = 'settings'
+    __tablename__ = "settings"
     user_id = mapped_column(Integer(), primary_key=True)
     language = mapped_column(String(), default="ru")
     rounding_rule = mapped_column(Integer(), default=50)
     quarter = mapped_column(Integer(), default=1)
 
 
-
-
-# async_session.add(User(name="Yes"))
-# await async_session.commit()
-# print("COMMITED")
-# result = await async_session.execute(select(User).filter_by(name="sdf"))
-# result = result.fetchall()
-# if result != []:
-#     print(result[0][0].name)
-# await async_session.close()
-
-# if __name__ == "__main__":
-#     asyncio.run(init_models())
-#     asyncio.run(main())
 class DataBase:
-    _states = {}
+    _states: Dict[int, Union[str, list, dict, int]] = {}
 
     async def initialize(self):
         async with self.engine.begin() as conn:
@@ -53,7 +36,7 @@ class DataBase:
     def __init__(self, dbname: str = "sqldb.db"):
         self.engine = create_async_engine(
             "sqlite+aiosqlite:///" + dbname,
-            echo=True,
+            echo=False,
         )
         self.async_session = AsyncSession(self.engine, expire_on_commit=False)
 
@@ -61,7 +44,8 @@ class DataBase:
         asyncio.shield(self.async_session.close())
         asyncio.shield(self.engine.dispose())
 
-        #asyncio.get_event_loop().run_until_complete(asyncio.shield(self.engine.close()))
+        # asyncio.get_event_loop().run_until_complete(asyncio.shield(self.engine.close()))
+
     # temporary storage get
     def get_value(self, userid, key):
         if userid in self._states:
@@ -84,14 +68,19 @@ class DataBase:
         elif "password" not in self._states[userid]:
             pass
         else:
-            return self._states[userid]["login"], self._states[userid]["password"]
-        result = await self.async_session.execute(select(Info).filter_by(user_id=userid))
+            return (
+                self._states[userid]["login"],
+                self._states[userid]["password"],
+            )
+        result = await self.async_session.execute(
+            select(Info).filter_by(user_id=userid)
+        )
         result = result.fetchone()
         if result is None:
             return None
         logging.debug(result)
         return result[0].login, result[0].password
-    
+
     async def get_language(self, userid):
         logging.debug("GETLANGUAGE")
         if userid not in self._states:
@@ -100,7 +89,9 @@ class DataBase:
             pass
         else:
             return self._states[userid]["language"]
-        result = await self.async_session.execute(select(Settings).filter_by(user_id=userid))
+        result = await self.async_session.execute(
+            select(Settings).filter_by(user_id=userid)
+        )
         settings_object = result.fetchone()
         if not settings_object:
             return None
@@ -117,17 +108,16 @@ class DataBase:
             pass
         else:
             return self._states[userid]["rounding_rule"]
-        result = await self.async_session.execute(select(Settings).filter_by(user_id=userid))
-        select_query = """
-            SELECT rounding_rule from settings where userid=?;
-        """
+        result = await self.async_session.execute(
+            select(Settings).filter_by(user_id=userid)
+        )
         rounding_rule = result.fetchone()
         if rounding_rule is None:
             return None
         self._states[userid]["rounding_rule"] = rounding_rule[0].rounding_rule
         result.close()
         return rounding_rule[0].rounding_rule
-    
+
     async def get_quarter(self, userid):
         logging.debug("GETQUARTER")
         if userid not in self._states:
@@ -136,7 +126,9 @@ class DataBase:
             pass
         else:
             return self._states[userid]["quarter"]
-        result = await self.async_session.execute(select(Settings).filter_by(user_id=userid))
+        result = await self.async_session.execute(
+            select(Settings).filter_by(user_id=userid)
+        )
         quarter = result.fetchone()
         if quarter is None:
             return None
@@ -149,10 +141,11 @@ class DataBase:
             self._states[userid] = {}
         self._states[userid]["login"] = login
         self._states[userid]["password"] = password
-        select_query = """
-            INSERT OR REPLACE INTO info (userid, login, password) VALUES (?,?,?);
-        """
-        stmt = insert(Info).prefix_with("OR REPLACE").values(user_id=userid, login=login, password=password)
+        stmt = (
+            insert(Info)
+            .prefix_with("OR REPLACE")
+            .values(user_id=userid, login=login, password=password)
+        )
         await self.async_session.execute(stmt)
         await self.async_session.commit()
 
@@ -164,10 +157,9 @@ class DataBase:
                 del self._states[userid]["password"]
             if "DNSID" in self._states[userid]:
                 del self._states[userid]["DNSID"]
-        delete_query = """
-            DELETE from info where userid=?;
-        """
-        result = await self.async_session.execute(select(Info).filter_by(user_id=userid))
+        result = await self.async_session.execute(
+            select(Info).filter_by(user_id=userid)
+        )
         result = result.fetchone()
         if len(result) == 0:
             raise RuntimeError("no login 'n pass in db")
@@ -179,13 +171,14 @@ class DataBase:
         if userid not in self._states:
             self._states[userid] = {}
         self._states[userid]["language"] = language
-        select_query = """
-            INSERT OR REPLACE INTO settings (userid, language, rounding_rule) VALUES (?,?, (SELECT rounding_rule FROM settings WHERE userid=?));
-        """
-        result = await self.async_session.execute(select(Settings).filter_by(user_id=userid))
+        result = await self.async_session.execute(
+            select(Settings).filter_by(user_id=userid)
+        )
         languageobject = result.fetchone()
         if languageobject is None:
-            self.async_session.add(Settings(user_id=userid, language=language, rounding_rule=50))
+            self.async_session.add(
+                Settings(user_id=userid, language=language, rounding_rule=50)
+            )
             await self.async_session.commit()
         else:
             languageobject = languageobject[0]
@@ -198,13 +191,16 @@ class DataBase:
         if userid not in self._states:
             self._states[userid] = {}
         self._states[userid]["rounding_rule"] = rounding_rule
-        select_query = """
-            INSERT OR REPLACE INTO settings (userid, language, rounding_rule) VALUES (?,(SELECT language FROM settings WHERE userid=?),?);
-        """
-        result = await self.async_session.execute(select(Settings).filter_by(user_id=userid))
+        result = await self.async_session.execute(
+            select(Settings).filter_by(user_id=userid)
+        )
         rounding_rule_object = result.fetchone()
         if rounding_rule_object is None:
-            self.async_session.add(Settings(user_id=userid, language=rounding_rule, rounding_rule=50))
+            self.async_session.add(
+                Settings(
+                    user_id=userid, language=rounding_rule, rounding_rule=50
+                )
+            )
             await self.async_session.commit()
         else:
             rounding_rule_object = rounding_rule_object[0]
@@ -216,7 +212,9 @@ class DataBase:
         if userid not in self._states:
             self._states[userid] = {}
         self._states[userid]["quarter"] = quarter
-        result = await self.async_session.execute(select(Settings).filter_by(user_id=userid))
+        result = await self.async_session.execute(
+            select(Settings).filter_by(user_id=userid)
+        )
         quarterobject = result.fetchone()
         if quarterobject is None:
             self.async_session.add(Settings(user_id=userid, quarter=quarter))
@@ -227,4 +225,3 @@ class DataBase:
             self.async_session.add(quarterobject)
             await self.async_session.commit()
         self._states[userid]["quarter"] = quarter
-
