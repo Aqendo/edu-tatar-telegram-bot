@@ -3,3 +3,4 @@ aiosqlite
 sqlalchemy==2.0.0b4
 python-dotenv
 bs4
+lxml

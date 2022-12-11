@@ -1,7 +1,5 @@
 import asyncio
 import logging
-from os import getenv
-
 from dotenv import find_dotenv, load_dotenv
 
 from bot import Bot, bot_types
@@ -13,10 +11,10 @@ from .parser_edu_tatar import EduTatarParser
 
 
 class EduTatarModule(BaseModule):
-    def __init__(self, bot: Bot):
+    def __init__(self, bot: Bot, db_path: str):
         self.bot = bot
         load_dotenv(find_dotenv())
-        self.db = DataBase(getenv("DB_PATH", "db.db"))
+        self.db = DataBase(db_path)
         asyncio.shield(self.db.initialize())
         self.parser = EduTatarParser()
         logging.basicConfig(level=logging.INFO)
@@ -478,7 +476,7 @@ class EduTatarModule(BaseModule):
 
     async def send_message_choose_language(self, update: bot_types.Message):
         message = await self.bot.send_message(
-            update.chat.id,
+            update.from_user.id,
             "✋ Здравствуйте, выберите свой язык:",
             reply_markup={
                 "inline_keyboard": [
@@ -511,6 +509,18 @@ class EduTatarModule(BaseModule):
                 ]
             },
         )
+
+    async def language_configure_start_bot(self, user_id: int, update):
+        if isinstance(self.db.get_value(user_id, "message_language"), int):
+            # i don't care if it makes an error.
+            await self.bot.make_request(
+                "deleteMessage",
+                {
+                    "chat_id": user_id,
+                    "message_id": self.db.get_value(user_id, "message_language"),
+                },
+            )
+        await self.send_message_choose_language(update)
 
     async def update_default_quarter(
         self, user_id, language, update: bot_types.CallbackQuery
@@ -547,8 +557,16 @@ class EduTatarModule(BaseModule):
     async def onCallbackQuery(self, update: bot_types.CallbackQuery):  # noqa: C901
         user_id = update.from_user.id
         language = await self.db.get_language(user_id)
+        login_and_password = await self.db.get_login_and_password(user_id)
+
         if update.data in ("set_russian", "set_tatar"):
             await self.set_language_from_callback(update)
+        elif login_and_password is None:
+            # Database was destructed or something and now
+            # we don't have this user in database
+            self.db.set_value(user_id, "state", "language")
+            await self.language_configure_start_bot(user_id, update)
+            return
         elif update.data == "daily_grades":
             await self.show_daily_grades(user_id, language, update)
         elif update.data == "quarter_grades":
@@ -607,16 +625,7 @@ class EduTatarModule(BaseModule):
             self.db.set_value(user_id, "state", "language")
             await self.send_message_choose_language(update)
         elif state == "language":
-            if isinstance(self.db.get_value(user_id, "message_language"), int):
-                # i don't care if it makes an error.
-                await self.bot.make_request(
-                    "deleteMessage",
-                    {
-                        "chat_id": user_id,
-                        "message_id": self.db.get_value(user_id, "message_language"),
-                    },
-                )
-                await self.send_message_choose_language(update)
+            await self.language_configure_start_bot(user_id, update)
         elif state == "login":
             if not update.text.isnumeric():
                 await self.bot.send_message(
@@ -661,7 +670,9 @@ class EduTatarModule(BaseModule):
                 await self.main_menu_message(update)
         elif state == "enter_rounding":
             if (
-                not update.text.isnumeric()
+                update.text is not None
+                or update.from_user is not None
+                or not update.text.isnumeric()
                 or len(update.text) != 2
                 or not (10 <= int(update.text) <= 99)
             ):

@@ -4,11 +4,13 @@ import time
 import traceback
 import typing
 from datetime import datetime
-from dotenv import load_dotenv, find_dotenv
+from os import getenv
+
 import aiohttp
 from bs4 import BeautifulSoup
+from dotenv import find_dotenv, load_dotenv
+
 from .languages import get_text
-from os import getenv
 
 load_dotenv(find_dotenv())
 if getenv("PROXY", "") == "":
@@ -83,7 +85,9 @@ class EduTatarParser:
         elif round(score_float % 1, 2) * 100 < rounding_rule:
             grades = [int(i) for i in list(grades)]
             count_added = 0
-            while round(sum(grades) / len(grades) % 1, 2) * 100 < rounding_rule:
+            while (
+                round(sum(grades) / len(grades) % 1, 2) * 100 < rounding_rule
+            ):
                 grades.append(5)
                 count_added += 1
             return f"(+{count_added})"
@@ -123,7 +127,9 @@ class EduTatarParser:
                 ) as response:
                     text = await response.text()
                     if "Мой дневник" in text:
-                        logging.info("Response cookies: {}".format(response.cookies))
+                        logging.info(
+                            "Response cookies: {}".format(response.cookies)
+                        )
                         return response.cookies["DNSID"]
                     else:
                         return None
@@ -139,7 +145,9 @@ class EduTatarParser:
         changed: bool = False,
         date: int = -1,
         language: str = "ru",
-    ) -> typing.Union[typing.Tuple[str, typing.Union[str, None], str, str], None]:
+    ) -> typing.Union[
+        typing.Tuple[str, typing.Union[str, None], str, str], None
+    ]:
         if date == -1:
             date = time.time()
         result = ""
@@ -158,7 +166,9 @@ class EduTatarParser:
                     DNSID = await self.get_DNSID(login, password)
                     if DNSID is None:
                         return None
-                    return await self.getDay(login, password, DNSID, True)
+                    return await self.getDay(
+                        login, password, DNSID, True, date, language
+                    )
                 bs4 = BeautifulSoup(response_text, "lxml")
                 dates = re.findall(self._regexDays, response_text)
                 datee = bs4.find("td", class_="d-date").text.strip()
@@ -172,7 +182,8 @@ class EduTatarParser:
                 tbody = bs4.find("table", class_="main").tbody
                 for tr in tbody.find_all(
                     "tr",
-                    style=lambda value: value and "text-align: center;" in value,
+                    style=lambda value: value
+                    and "text-align: center;" in value,
                 ):
                     tds = tr.find_all("td")
                     result += "<b>" + tds[0].text + "</b>\n"
@@ -251,9 +262,9 @@ class EduTatarParser:
                     tds_of_itog[-3].text,
                     tds_of_itog[-1].text,
                 )
-                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (
-                    DNSID if changed else None
-                )
+                return result.replace(
+                    "Основы безопасности жизнедеятельности", "ОБЖ"
+                ), (DNSID if changed else None)
 
     async def getYear(self, login, password, DNSID="", changed=False):
         async with aiohttp.ClientSession(
@@ -287,6 +298,6 @@ class EduTatarParser:
                         tds[0].text.strip(),
                         "".join([i.text.strip() for i in tds[1:-1]]),
                     )
-                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (
-                    DNSID if changed else None
-                )
+                return result.replace(
+                    "Основы безопасности жизнедеятельности", "ОБЖ"
+                ), (DNSID if changed else None)

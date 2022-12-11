@@ -9,5 +9,5 @@ from edutatar import EduTatarModule
 logging.basicConfig(level=logging.ERROR)
 load_dotenv(find_dotenv())
 bot = Bot(getenv("BOT_TOKEN", ""), 100)
-bot.load_module(EduTatarModule(bot))
+bot.load_module(EduTatarModule(bot, getenv("DB_PATH", "db.db")))
 bot.activate()
