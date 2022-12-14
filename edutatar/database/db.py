@@ -22,6 +22,7 @@ class Settings(Based):
     language = mapped_column(String(), default="ru")
     rounding_rule = mapped_column(Integer(), default=50)
     quarter = mapped_column(Integer(), default=1)
+    delimeter = mapped_column(Integer(), default=47)
 
 
 class DataBase:
@@ -99,6 +100,25 @@ class DataBase:
         self._states[userid]["language"] = settings_object[0].language
         self.logger.debug(settings_object[0].language)
         return settings_object[0].language
+
+    async def get_delimeter(self, userid):
+        self.logger.debug("GETDELIMETER")
+        if userid not in self._states:
+            self._states[userid] = {}
+        elif "delimeter" not in self._states[userid]:
+            pass
+        else:
+            return int(self._states[userid]["delimeter"])
+        result = await self.async_session.execute(
+            select(Settings).filter_by(user_id=userid)
+        )
+        settings_object = result.fetchone()
+        if not settings_object:
+            return None
+        result.close()
+        self._states[userid]["delimeter"] = settings_object[0].delimeter
+        self.logger.debug(settings_object[0].delimeter)
+        return int(settings_object[0].delimeter)
 
     async def get_rounding_rule(self, userid):
         self.logger.debug("GETROUND")
@@ -186,6 +206,27 @@ class DataBase:
             self.async_session.add(languageobject)
             await self.async_session.commit()
         self._states[userid]["language"] = language
+
+    async def set_delimeter(self, userid, delimeter):
+        self.logger.debug("delimeter SET")
+        if userid not in self._states:
+            self._states[userid] = {}
+        self._states[userid]["delimeter"] = delimeter
+        result = await self.async_session.execute(
+            select(Settings).filter_by(user_id=userid)
+        )
+        delimeterobject = result.fetchone()
+        if delimeterobject is None:
+            self.async_session.add(
+                Settings(user_id=userid, delimeter=delimeter)
+            )
+            await self.async_session.commit()
+        else:
+            delimeterobject = delimeterobject[0]
+            delimeterobject.delimeter = delimeter
+            self.async_session.add(delimeterobject)
+            await self.async_session.commit()
+        self._states[userid]["delimeter"] = delimeter
 
     async def set_rounding_rule(self, userid, rounding_rule):
         if userid not in self._states:

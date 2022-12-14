@@ -143,6 +143,7 @@ class EduTatarParser:
         login: str,
         password: str,
         DNSID: str = "",
+        delimeter: int = 47,
         changed: bool = False,
         date: int = -1,
         language: str = "ru",
@@ -168,7 +169,7 @@ class EduTatarParser:
                     if DNSID is None:
                         return None
                     return await self.getDay(
-                        login, password, DNSID, True, date, language
+                        login, password, DNSID, delimeter, True, date, language
                     )
                 bs4 = BeautifulSoup(response_text, "lxml")
                 dates = re.findall(self._regexDays, response_text)
@@ -178,7 +179,9 @@ class EduTatarParser:
                     + self.get_day_of_week(language, datee)
                     + " - "
                     + datee
-                    + "</b>\n-----------------------------------------------\n"
+                    + "</b>\n"
+                    + "-" * delimeter
+                    + "\n"
                 )
                 tbody = bs4.find("table", class_="main").tbody
                 for tr in tbody.find_all(
@@ -198,13 +201,8 @@ class EduTatarParser:
                             string_marks += i.text + "/"
                         string_marks = string_marks.rstrip("/")
                     result = result.rstrip(" ").rstrip("\n")
-                    result += (
-                        string_marks
-                        + "\n-----------------------------------------------\n"
-                    )
-                result = result.rstrip(
-                    "\n-----------------------------------------------\n"
-                )
+                    result += string_marks + "\n" + "-" * delimeter + "\n"
+                result = result.rstrip("\n" + "-" * delimeter + "\n")
                 return result, (DNSID if changed else None), dates[0], dates[1]
 
     async def getTerm(

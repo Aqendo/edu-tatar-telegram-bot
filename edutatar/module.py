@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 
 from dotenv import find_dotenv, load_dotenv
 
@@ -80,6 +81,16 @@ class EduTatarModule(BaseModule):
                 ],
                 [
                     {
+                        "text": "%s: %s"
+                        % (
+                            get_text(language, "delimeter"),
+                            await self.db.get_delimeter(user_id),
+                        ),
+                        "callback_data": "changeDelimeter",
+                    }
+                ],
+                [
+                    {
                         "text": get_text(language, "logout"),
                         "callback_data": "sureDeleteInfo",
                     }
@@ -93,7 +104,9 @@ class EduTatarModule(BaseModule):
             ]
         }
 
-    async def set_language_from_callback(self, update: bot_types.CallbackQuery):
+    async def set_language_from_callback(
+        self, update: bot_types.CallbackQuery
+    ):
         language = ""
         if update.data == "set_russian":
             language = "ru"
@@ -134,7 +147,7 @@ class EduTatarModule(BaseModule):
     ):
         login_and_password = await self.db.get_login_and_password(user_id)
         if login_and_password is None:
-            """Should be unreachable state"""
+            """Reachable only if database is destructed"""
             await self.bot.send_message(
                 chat_id=update.from_user.id,
                 text="Something went wrong. We apologise.",
@@ -144,6 +157,7 @@ class EduTatarModule(BaseModule):
             login_and_password[0],
             login_and_password[1],
             self.db.get_value(user_id, "DNSID"),
+            await self.db.get_delimeter(user_id),
         )
         if DNSID is not None:
             self.db.set_value(user_id, "DNSID", DNSID)
@@ -272,25 +286,33 @@ class EduTatarModule(BaseModule):
                     [
                         {
                             "text": get_text(language, "first_quarter"),
-                            "callback_data": "1" if update.data != "1" else "pass",
+                            "callback_data": "1"
+                            if update.data != "1"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "second_quarter"),
-                            "callback_data": "2" if update.data != "2" else "pass",
+                            "callback_data": "2"
+                            if update.data != "2"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "third_quarter"),
-                            "callback_data": "3" if update.data != "3" else "pass",
+                            "callback_data": "3"
+                            if update.data != "3"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "fourth_quarter"),
-                            "callback_data": "4" if update.data != "4" else "pass",
+                            "callback_data": "4"
+                            if update.data != "4"
+                            else "pass",
                         }
                     ],
                     [
@@ -310,6 +332,32 @@ class EduTatarModule(BaseModule):
                             "text": get_text(language, "back"),
                             "callback_data": "back",
                         },
+                    ],
+                ]
+            },
+        )
+
+    async def send_change_delimeter(
+        self, user_id: int, language: str, update: bot_types.CallbackQuery
+    ):
+        await self.bot.send_message(
+            chat_id=update.from_user.id,
+            text="%s:\n%s"
+            % (
+                get_text(language, "changeDelimeter"),
+                "-" * await self.db.get_delimeter(user_id),
+            ),
+            reply_markup={
+                "inline_keyboard": [
+                    [
+                        {"text": "-", "callback_data": "-"},
+                        {"text": "+", "callback_data": "+"},
+                    ],
+                    [
+                        {
+                            "text": get_text(language, "save"),
+                            "callback_data": "save_delimeter",
+                        }
                     ],
                 ]
             },
@@ -341,25 +389,33 @@ class EduTatarModule(BaseModule):
                     [
                         {
                             "text": get_text(language, "first_quarter"),
-                            "callback_data": "1" if update.data != "1" else "pass",
+                            "callback_data": "1"
+                            if update.data != "1"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "second_quarter"),
-                            "callback_data": "2" if update.data != "2" else "pass",
+                            "callback_data": "2"
+                            if update.data != "2"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "third_quarter"),
-                            "callback_data": "3" if update.data != "3" else "pass",
+                            "callback_data": "3"
+                            if update.data != "3"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "fourth_quarter"),
-                            "callback_data": "4" if update.data != "4" else "pass",
+                            "callback_data": "4"
+                            if update.data != "4"
+                            else "pass",
                         }
                     ],
                     [
@@ -415,7 +471,9 @@ class EduTatarModule(BaseModule):
     async def send_message_change_rounding(
         self, user_id: int, language: str, update: bot_types.CallbackQuery
     ):
-        await self.bot.send_message(user_id, get_text(language, "enter_rounding"))
+        await self.bot.send_message(
+            user_id, get_text(language, "enter_rounding")
+        )
         self.db.set_value(user_id, "state", "enter_rounding")
 
     async def change_daily_grades(
@@ -488,7 +546,9 @@ class EduTatarModule(BaseModule):
                 ]
             },
         )
-        self.db.set_value(update.from_user.id, "message_language", message.message_id)
+        self.db.set_value(
+            update.from_user.id, "message_language", message.message_id
+        )
 
     async def are_you_sure(self, user_id, language, update):
         await self.bot.edit_message_text(
@@ -518,7 +578,9 @@ class EduTatarModule(BaseModule):
                 "deleteMessage",
                 {
                     "chat_id": user_id,
-                    "message_id": self.db.get_value(user_id, "message_language"),
+                    "message_id": self.db.get_value(
+                        user_id, "message_language"
+                    ),
                 },
             )
         await self.send_message_choose_language(update)
@@ -555,7 +617,9 @@ class EduTatarModule(BaseModule):
             self.db.set_value(user_id, "DNSID", DNSID)
             return True
 
-    async def onCallbackQuery(self, update: bot_types.CallbackQuery):  # noqa: C901
+    async def onCallbackQuery(
+        self, update: bot_types.CallbackQuery
+    ):  # noqa: C901
         user_id = update.from_user.id
         language = await self.db.get_language(user_id)
         login_and_password = await self.db.get_login_and_password(user_id)
@@ -581,13 +645,17 @@ class EduTatarModule(BaseModule):
         elif update.data == "settings":
             await self.settings_menu(update)
         elif update.data in ("set_ru", "set_tr"):
-            await self.update_language_and_message_settings(user_id, language, update)
+            await self.update_language_and_message_settings(
+                user_id, language, update
+            )
         elif update.data == "change_rounding":
             await self.send_message_change_rounding(user_id, language, update)
         elif update.data == "copy":
             await self.bot.send_message(
                 user_id, update.message.text, entities=update.message.entities
             )
+        elif update.data == "changeDelimeter":
+            await self.send_change_delimeter(user_id, language, update)
         elif update.data == "back":
             await self.go_back_callback(user_id, language, update)
         elif update.data == "sureDeleteInfo":
@@ -598,6 +666,38 @@ class EduTatarModule(BaseModule):
             await self.change_daily_grades(user_id, language, update)
         elif update.data == "pass":
             await self.bot.answer_callback_query(update.id)
+        elif update.data == "-":
+            amount = update.message.text.count("-") - 1
+            if amount < 1:
+                await self.bot.answer_callback_query(
+                    update.id, "Слишком маленький!"
+                )
+                return
+            await self.bot.edit_message_text(
+                re.sub(r"\-+$", "", update.message.text)
+                + ("-" * (amount - 1)),
+                user_id,
+                update.message.message_id,
+                reply_markup=update.message.reply_markup,
+            )
+        elif update.data == "+":
+            amount = update.message.text.count("-") - 1
+            if amount >= 100:
+                await self.bot.answer_callback_query(
+                    update.id, "Слишком большой!"
+                )
+                return
+            await self.bot.edit_message_text(
+                re.sub(r"\-+$", "", update.message.text)
+                + ("-" * (amount + 1)),
+                user_id,
+                update.message.message_id,
+                reply_markup=update.message.reply_markup,
+            )
+        elif update.data == "save_delimeter":
+            amount = str(update.message.text.count("-") - 1)
+            await self.db.set_delimeter(user_id, str(amount))
+            await self.go_back_callback(user_id, language, update)
 
     async def onMessageOnly(self, update: bot_types.Message):  # noqa: C901
         user_id = update.from_user.id
@@ -669,7 +769,6 @@ class EduTatarModule(BaseModule):
                 )
                 await self.main_menu_message(update)
         elif state == "enter_rounding":
-            print("CHECK ROUNDING")
             if (
                 update.text is None
                 or update.from_user is None
