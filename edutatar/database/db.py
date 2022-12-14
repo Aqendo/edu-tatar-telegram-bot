@@ -6,7 +6,6 @@ from sqlalchemy import Integer, String, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, mapped_column
 
-logging.basicConfig(level=logging.INFO)
 Based = declarative_base()
 
 
@@ -38,6 +37,7 @@ class DataBase:
             "sqlite+aiosqlite:///" + dbname,
             echo=False,
         )
+        self.logger = logging.getLogger(__name__)
         self.async_session = AsyncSession(self.engine, expire_on_commit=False)
 
     def __del__(self):
@@ -62,7 +62,7 @@ class DataBase:
             self._states[userid][key] = value
 
     async def get_login_and_password(self, userid):
-        logging.debug("GETLOGIN")
+        self.logger.debug("GETLOGIN")
         if userid not in self._states:
             self._states[userid] = {}
         elif "password" not in self._states[userid]:
@@ -78,11 +78,11 @@ class DataBase:
         result = result.fetchone()
         if result is None:
             return None
-        logging.debug(result)
+        self.logger.debug(result)
         return result[0].login, result[0].password
 
     async def get_language(self, userid):
-        logging.debug("GETLANGUAGE")
+        self.logger.debug("GETLANGUAGE")
         if userid not in self._states:
             self._states[userid] = {}
         elif "language" not in self._states[userid]:
@@ -97,11 +97,11 @@ class DataBase:
             return None
         result.close()
         self._states[userid]["language"] = settings_object[0].language
-        logging.debug(settings_object[0].language)
+        self.logger.debug(settings_object[0].language)
         return settings_object[0].language
 
     async def get_rounding_rule(self, userid):
-        logging.debug("GETROUND")
+        self.logger.debug("GETROUND")
         if userid not in self._states:
             self._states[userid] = {}
         elif "rounding_rule" not in self._states[userid]:
@@ -119,7 +119,7 @@ class DataBase:
         return rounding_rule[0].rounding_rule
 
     async def get_quarter(self, userid):
-        logging.debug("GETQUARTER")
+        self.logger.debug("GETQUARTER")
         if userid not in self._states:
             self._states[userid] = {}
         elif "quarter" not in self._states[userid]:
@@ -167,7 +167,7 @@ class DataBase:
         await self.async_session.commit()
 
     async def set_language(self, userid, language):
-        logging.debug("LANGUAGE SET")
+        self.logger.debug("LANGUAGE SET")
         if userid not in self._states:
             self._states[userid] = {}
         self._states[userid]["language"] = language

@@ -42,7 +42,7 @@ class EduTatarParser:
 
     def __init__(self):
         self.session = aiohttp.ClientSession(headers=self._headers)
-        self.logging = logging.getLogger(__name__)
+        self.logger = logging.getLogger(__name__)
 
     months = {
         "Янв": 1,
@@ -72,9 +72,10 @@ class EduTatarParser:
     def get_count_of_five_to_the_next_mark(
         self, score: str, rounding_rule: int, grades: str
     ):
+        assert rounding_rule is not None
         if score == "" or grades == "":
             return ""
-        self.logging.debug(
+        self.logger.debug(
             "Score given: {}, Rounding rule given: {}, Grades given: {}".format(
                 score, rounding_rule, grades
             )
@@ -127,7 +128,7 @@ class EduTatarParser:
                 ) as response:
                     text = await response.text()
                     if "Мой дневник" in text:
-                        logging.info(
+                        self.logger.info(
                             "Response cookies: {}".format(response.cookies)
                         )
                         return response.cookies["DNSID"]

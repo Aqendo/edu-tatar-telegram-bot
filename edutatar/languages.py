@@ -1,7 +1,7 @@
 import logging
 import traceback
 
-logger = logging.getLogger()
+__logger = logging.getLogger(__name__)
 # flake8: noqa
 strings = {
     "ru": {
@@ -80,7 +80,9 @@ strings = {
 
 
 def get_text(language, string):
-    logger.debug("ASKED FOR STRING: {}, LANGUAGE: {}".format(string, language))
+    __logger.debug(
+        "ASKED FOR STRING: {}, LANGUAGE: {}".format(string, language)
+    )
     try:
         return strings[language][string]
     except KeyError as e:
