@@ -4,5 +4,6 @@ venv/
 __pycache__/
 database/__pyche__/
 *.db
+db/
 tests/
 test/
