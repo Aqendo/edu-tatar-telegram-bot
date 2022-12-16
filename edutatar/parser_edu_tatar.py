@@ -60,13 +60,13 @@ class EduTatarParser:
     }
 
     days_of_the_week = [
-        {"ru": "Понедельник", "tr": ""},
-        {"ru": "Вторник", "tr": ""},
-        {"ru": "Среда", "tr": ""},
-        {"ru": "Четверг", "tr": ""},
-        {"ru": "Пятница", "tr": ""},
-        {"ru": "Суббота", "tr": ""},
-        {"ru": "Воскресенье", "tr": ""},
+        {"ru": "Понедельник", "tr": "Дүшәмбе"},
+        {"ru": "Вторник", "tr": "Сишәмбе"},
+        {"ru": "Среда", "tr": "Чәршәмбе"},
+        {"ru": "Четверг", "tr": "Пәнҗешәмбе"},
+        {"ru": "Пятница", "tr": "Җомга"},
+        {"ru": "Суббота", "tr": "Шимбә"},
+        {"ru": "Воскресенье", "tr": "Якшәмбе"},
     ]
 
     def get_count_of_five_to_the_next_mark(
@@ -86,9 +86,7 @@ class EduTatarParser:
         elif round(score_float % 1, 2) * 100 < rounding_rule:
             grades = [int(i) for i in list(grades)]
             count_added = 0
-            while (
-                round(sum(grades) / len(grades) % 1, 2) * 100 < rounding_rule
-            ):
+            while round(sum(grades) / len(grades) % 1, 2) * 100 < rounding_rule:
                 grades.append(5)
                 count_added += 1
             return f"(+{count_added})"
@@ -104,6 +102,7 @@ class EduTatarParser:
             return f"(+{count_added})"
 
     def get_day_of_week(self, language: str, string: str):
+        self.logger.debug("GET_DAY_OF_THE_WEEK %s %s" % (language, string))
         string = string.split(" ")
         return self.days_of_the_week[
             datetime.weekday(
@@ -147,9 +146,11 @@ class EduTatarParser:
         changed: bool = False,
         date: int = -1,
         language: str = "ru",
-    ) -> typing.Union[
-        typing.Tuple[str, typing.Union[str, None], str, str], None
-    ]:
+    ) -> typing.Union[typing.Tuple[str, typing.Union[str, None], str, str], None]:
+        self.logger.debug(
+            "GET_DAY, login: %s, password: %s, DNSID: %s, delimeter: %d, changed: %s, date: %d, language: %s"
+            % (login, password, DNSID, delimeter, changed, date, language)
+        )
         if date == -1:
             date = time.time()
         result = ""
@@ -186,8 +187,7 @@ class EduTatarParser:
                 tbody = bs4.find("table", class_="main").tbody
                 for tr in tbody.find_all(
                     "tr",
-                    style=lambda value: value
-                    and "text-align: center;" in value,
+                    style=lambda value: value and "text-align: center;" in value,
                 ):
                     tds = tr.find_all("td")
                     result += "<b>" + tds[0].text + "</b>\n"
@@ -261,9 +261,9 @@ class EduTatarParser:
                     tds_of_itog[-3].text,
                     tds_of_itog[-1].text,
                 )
-                return result.replace(
-                    "Основы безопасности жизнедеятельности", "ОБЖ"
-                ), (DNSID if changed else None)
+                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (
+                    DNSID if changed else None
+                )
 
     async def getYear(self, login, password, DNSID="", changed=False):
         async with aiohttp.ClientSession(
@@ -297,6 +297,6 @@ class EduTatarParser:
                         tds[0].text.strip(),
                         "".join([i.text.strip() for i in tds[1:-1]]),
                     )
-                return result.replace(
-                    "Основы безопасности жизнедеятельности", "ОБЖ"
-                ), (DNSID if changed else None)
+                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (
+                    DNSID if changed else None
+                )
