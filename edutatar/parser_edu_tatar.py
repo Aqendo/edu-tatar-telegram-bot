@@ -197,6 +197,8 @@ class EduTatarParser:
                     marks_tr = tds[4].tr
                     if marks_tr is not None:
                         string_marks += f"\n{get_text(language, 'marks')}: "
+                        if "Болел" in tds[3].text:
+                            string_marks += "б "
                         for i in marks_tr.find_all("td"):
                             string_marks += i.text + "/"
                         string_marks = string_marks.rstrip("/")
