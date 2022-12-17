@@ -8,7 +8,7 @@
 И для этого я создал этот проект. 
 ## Установка
 ### Публичный инстанс:
-- @edutatarexpressbot
+- [@edutatarclientbot](https://t.me/edutatarclientbot)
 ### Локально
 Здесь есть Dockerfile с которым вы можете легко разместить бота у себя на сервере
 
