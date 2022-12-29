@@ -22,7 +22,7 @@ else:
 class EduTatarParser:
     # _backslash = "\n"  # WHY PYTHON HAS A REGEX TO NOT HAVE \ IN THE FSTRING
     _regexDays = re.compile(r"day\?for=(\d+)")
-    _logon_page_detector_word = "apastovo"
+    _logon_page_detector_word = "Выберите дальнейшее действие"
     _headers = {
         "User-Agent": "Mozilla/5.0 (X11; Linux x86_64; rv:103.0) Gecko/20100101 Firefox/103.0",  # noqa: E501
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",  # noqa: E501
@@ -86,7 +86,9 @@ class EduTatarParser:
         elif round(score_float % 1, 2) * 100 < rounding_rule:
             grades = [int(i) for i in list(grades)]
             count_added = 0
-            while round(sum(grades) / len(grades) % 1, 2) * 100 < rounding_rule:
+            while (
+                round(sum(grades) / len(grades) % 1, 2) * 100 < rounding_rule
+            ):
                 grades.append(5)
                 count_added += 1
             return f"(+{count_added})"
@@ -119,7 +121,7 @@ class EduTatarParser:
             "main_login2": login,
             "main_password2": password,
         }
-        print("Login: {}, password: {}".format(login, password))
+        self.logger.debug("Login: {}, password: {}".format(login, password))
         try:
             async with aiohttp.ClientSession(headers=self._headers) as session:
                 async with session.post(
@@ -146,7 +148,9 @@ class EduTatarParser:
         changed: bool = False,
         date: int = -1,
         language: str = "ru",
-    ) -> typing.Union[typing.Tuple[str, typing.Union[str, None], str, str], None]:
+    ) -> typing.Union[
+        typing.Tuple[str, typing.Union[str, None], str, str], None
+    ]:
         self.logger.debug(
             "GET_DAY, login: %s, password: %s, DNSID: %s, delimeter: %d, changed: %s, date: %d, language: %s"
             % (login, password, DNSID, delimeter, changed, date, language)
@@ -187,7 +191,8 @@ class EduTatarParser:
                 tbody = bs4.find("table", class_="main").tbody
                 for tr in tbody.find_all(
                     "tr",
-                    style=lambda value: value and "text-align: center;" in value,
+                    style=lambda value: value
+                    and "text-align: center;" in value,
                 ):
                     tds = tr.find_all("td")
                     result += "<b>" + tds[0].text + "</b>\n"
@@ -215,7 +220,7 @@ class EduTatarParser:
         DNSID: str = "",
         changed: bool = False,
         rounding_rule: int = 50,
-    ) -> typing.Union[typing.Tuple[str, typing.Union[str, None]], None]:
+    ) -> typing.Union[typing.Tuple[str, typing.Union[str, None], bool], None]:
         result = ""
         async with aiohttp.ClientSession(
             headers=self._headers, cookies={"DNSID": DNSID}
@@ -240,6 +245,7 @@ class EduTatarParser:
                         changed=True,
                         rounding_rule=rounding_rule,
                     )
+                half_year = "полугодие" in responseText
                 bs4 = BeautifulSoup(responseText, "lxml")
                 tbody = bs4.find("table", class_="term-marks").tbody
                 trs = tbody.find_all("tr")
@@ -263,8 +269,12 @@ class EduTatarParser:
                     tds_of_itog[-3].text,
                     tds_of_itog[-1].text,
                 )
-                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (
-                    DNSID if changed else None
+                return (
+                    result.replace(
+                        "Основы безопасности жизнедеятельности", "ОБЖ"
+                    ),
+                    (DNSID if changed else None),
+                    half_year,
                 )
 
     async def getYear(self, login, password, DNSID="", changed=False):
@@ -278,7 +288,7 @@ class EduTatarParser:
             ) as response:
                 response_text = await response.text()
                 if (
-                    "apastovo" in response_text
+                    "Пользователь не найден" in response_text
                 ):  # some kind of "indicator" for /logon page
                     DNSID = await self.get_DNSID(login, password)
                     if DNSID is None:
@@ -299,6 +309,6 @@ class EduTatarParser:
                         tds[0].text.strip(),
                         "".join([i.text.strip() for i in tds[1:-1]]),
                     )
-                return result.replace("Основы безопасности жизнедеятельности", "ОБЖ"), (
-                    DNSID if changed else None
-                )
+                return result.replace(
+                    "Основы безопасности жизнедеятельности", "ОБЖ"
+                ), (DNSID if changed else None)

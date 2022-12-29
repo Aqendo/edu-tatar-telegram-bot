@@ -104,7 +104,9 @@ class EduTatarModule(BaseModule):
             ]
         }
 
-    async def set_language_from_callback(self, update: bot_types.CallbackQuery):
+    async def set_language_from_callback(
+        self, update: bot_types.CallbackQuery
+    ):
         language = ""
         if update.data == "set_russian":
             language = "ru"
@@ -197,7 +199,7 @@ class EduTatarModule(BaseModule):
                 text="Something went wrong. We apologise.",
             )  # TODO: i don't know the case when it can be
             return
-        result, DNSID = await self.parser.getTerm(
+        result, DNSID, half_year = await self.parser.getTerm(
             login_and_password[0],
             login_and_password[1],
             termNum=quarter,
@@ -214,13 +216,17 @@ class EduTatarModule(BaseModule):
                 "inline_keyboard": [
                     [
                         {
-                            "text": get_text(language, "first_quarter"),
+                            "text": get_text(language, "first_quarter")
+                            if not half_year
+                            else get_text(language, "first_halfyear"),
                             "callback_data": "1",
                         }
                     ],
                     [
                         {
-                            "text": get_text(language, "second_quarter"),
+                            "text": get_text(language, "second_quarter")
+                            if not half_year
+                            else get_text(language, "second_halfyear"),
                             "callback_data": "2",
                         }
                     ],
@@ -229,13 +235,17 @@ class EduTatarModule(BaseModule):
                             "text": get_text(language, "third_quarter"),
                             "callback_data": "3",
                         }
-                    ],
+                    ]
+                    if not half_year
+                    else [],
                     [
                         {
                             "text": get_text(language, "fourth_quarter"),
                             "callback_data": "4",
                         }
-                    ],
+                    ]
+                    if not half_year
+                    else [],
                     [
                         {
                             "text": get_text(language, "year"),
@@ -267,7 +277,7 @@ class EduTatarModule(BaseModule):
             )  # TODO: do not do like that hehe
             return
         rounding_rule = await self.db.get_rounding_rule(user_id)
-        result, DNSID = await self.parser.getTerm(
+        result, DNSID, half_year = await self.parser.getTerm(
             login_and_password[0],
             login_and_password[1],
             termNum=update.data,
@@ -284,28 +294,44 @@ class EduTatarModule(BaseModule):
                 "inline_keyboard": [
                     [
                         {
-                            "text": get_text(language, "first_quarter"),
-                            "callback_data": "1" if update.data != "1" else "pass",
+                            "text": get_text(language, "first_quarter")
+                            if not half_year
+                            else get_text(language, "first_halfyear"),
+                            "callback_data": "1"
+                            if update.data != "1"
+                            else "pass",
                         }
                     ],
                     [
                         {
-                            "text": get_text(language, "second_quarter"),
-                            "callback_data": "2" if update.data != "2" else "pass",
+                            "text": get_text(language, "second_quarter")
+                            if not half_year
+                            else get_text(language, "second_halfyear"),
+                            "callback_data": "2"
+                            if update.data != "2"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "third_quarter"),
-                            "callback_data": "3" if update.data != "3" else "pass",
+                            "callback_data": "3"
+                            if update.data != "3"
+                            else "pass",
                         }
-                    ],
+                    ]
+                    if not half_year
+                    else [],
                     [
                         {
                             "text": get_text(language, "fourth_quarter"),
-                            "callback_data": "4" if update.data != "4" else "pass",
+                            "callback_data": "4"
+                            if update.data != "4"
+                            else "pass",
                         }
-                    ],
+                    ]
+                    if not half_year
+                    else [],
                     [
                         {
                             "text": get_text(language, "year"),
@@ -382,25 +408,33 @@ class EduTatarModule(BaseModule):
                     [
                         {
                             "text": get_text(language, "first_quarter"),
-                            "callback_data": "1" if update.data != "1" else "pass",
+                            "callback_data": "1"
+                            if update.data != "1"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "second_quarter"),
-                            "callback_data": "2" if update.data != "2" else "pass",
+                            "callback_data": "2"
+                            if update.data != "2"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "third_quarter"),
-                            "callback_data": "3" if update.data != "3" else "pass",
+                            "callback_data": "3"
+                            if update.data != "3"
+                            else "pass",
                         }
                     ],
                     [
                         {
                             "text": get_text(language, "fourth_quarter"),
-                            "callback_data": "4" if update.data != "4" else "pass",
+                            "callback_data": "4"
+                            if update.data != "4"
+                            else "pass",
                         }
                     ],
                     [
@@ -456,7 +490,9 @@ class EduTatarModule(BaseModule):
     async def send_message_change_rounding(
         self, user_id: int, language: str, update: bot_types.CallbackQuery
     ):
-        await self.bot.send_message(user_id, get_text(language, "enter_rounding"))
+        await self.bot.send_message(
+            user_id, get_text(language, "enter_rounding")
+        )
         self.db.set_value(user_id, "state", "enter_rounding")
 
     async def change_daily_grades(
@@ -530,7 +566,9 @@ class EduTatarModule(BaseModule):
                 ]
             },
         )
-        self.db.set_value(update.from_user.id, "message_language", message.message_id)
+        self.db.set_value(
+            update.from_user.id, "message_language", message.message_id
+        )
 
     async def are_you_sure(self, user_id, language, update):
         await self.bot.edit_message_text(
@@ -560,7 +598,9 @@ class EduTatarModule(BaseModule):
                 "deleteMessage",
                 {
                     "chat_id": user_id,
-                    "message_id": self.db.get_value(user_id, "message_language"),
+                    "message_id": self.db.get_value(
+                        user_id, "message_language"
+                    ),
                 },
             )
         await self.send_message_choose_language(update)
@@ -597,7 +637,9 @@ class EduTatarModule(BaseModule):
             self.db.set_value(user_id, "DNSID", DNSID)
             return True
 
-    async def onCallbackQuery(self, update: bot_types.CallbackQuery):  # noqa: C901
+    async def onCallbackQuery(
+        self, update: bot_types.CallbackQuery
+    ):  # noqa: C901
         user_id = update.from_user.id
         language = await self.db.get_language(user_id)
         login_and_password = await self.db.get_login_and_password(user_id)
@@ -623,7 +665,9 @@ class EduTatarModule(BaseModule):
         elif update.data == "settings":
             await self.settings_menu(update)
         elif update.data in ("set_ru", "set_tr"):
-            await self.update_language_and_message_settings(user_id, language, update)
+            await self.update_language_and_message_settings(
+                user_id, language, update
+            )
         elif update.data == "change_rounding":
             await self.send_message_change_rounding(user_id, language, update)
         elif update.data == "copy":
@@ -645,7 +689,9 @@ class EduTatarModule(BaseModule):
         elif update.data in ["-", "2-"]:
             amount = update.message.text.count("-") - 1
             if amount < 2:
-                await self.bot.answer_callback_query(update.id, "Слишком маленький!")
+                await self.bot.answer_callback_query(
+                    update.id, "Слишком маленький!"
+                )
                 return
             if update.data == "-":
                 to_delete = 1
@@ -655,7 +701,8 @@ class EduTatarModule(BaseModule):
                 assert False, "Unreachable"
             self.logger.debug(f"to_delete {to_delete}")
             await self.bot.edit_message_text(
-                re.sub(r"\-+$", "", update.message.text) + ("-" * (amount - to_delete)),
+                re.sub(r"\-+$", "", update.message.text)
+                + ("-" * (amount - to_delete)),
                 user_id,
                 update.message.message_id,
                 reply_markup=update.message.reply_markup,
@@ -669,10 +716,13 @@ class EduTatarModule(BaseModule):
             else:
                 assert False, "Unreachable"
             if amount >= 100:
-                await self.bot.answer_callback_query(update.id, "Слишком большой!")
+                await self.bot.answer_callback_query(
+                    update.id, "Слишком большой!"
+                )
                 return
             await self.bot.edit_message_text(
-                re.sub(r"\-+$", "", update.message.text) + ("-" * (amount + to_add)),
+                re.sub(r"\-+$", "", update.message.text)
+                + ("-" * (amount + to_add)),
                 user_id,
                 update.message.message_id,
                 reply_markup=update.message.reply_markup,
