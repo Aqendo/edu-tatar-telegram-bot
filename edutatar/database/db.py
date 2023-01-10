@@ -1,13 +1,31 @@
 import asyncio
 import logging
 from typing import Dict, Union
-
+from os import getenv
+from dotenv import find_dotenv, load_dotenv
 from sqlalchemy import Integer, String, insert, select
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base, mapped_column
 
+load_dotenv(find_dotenv())
 Based = declarative_base()
+from Crypto.Cipher import AES
+from base64 import b64decode, b64encode
+import os
+#key = b"abobaamolus12312"
+key = os.environ.get("KEY_ENCODE", "abobaamogus12312").encode("utf-8")
+nonce = b64decode(b'LFj1Vg9NueCxT+xSGq8G/Q==')
 
+def encrypttext(data: str):
+    cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
+    assert cipher.nonce == nonce
+    ciphertext, tag = cipher.encrypt_and_digest(data.encode("utf-8"))
+    return b64encode(ciphertext).decode("UTF-8")
+def decrypttext(data: str):
+    cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
+    assert cipher.nonce == nonce
+    plaintext = cipher.decrypt(b64decode(data.encode("utf-8")))
+    return plaintext.decode("utf-8")
 
 class Info(Based):
     __tablename__ = "info"
@@ -80,7 +98,9 @@ class DataBase:
         if result is None:
             return None
         self.logger.debug(result)
-        return result[0].login, result[0].password
+        self._states[userid]["login"] = decrypttext(result[0].login)
+        self._states[userid]["password"] = decrypttext(result[0].password)
+        return decrypttext(result[0].login), decrypttext(result[0].password)
 
     async def get_language(self, userid):
         self.logger.debug("GETLANGUAGE")
@@ -164,7 +184,7 @@ class DataBase:
         stmt = (
             insert(Info)
             .prefix_with("OR REPLACE")
-            .values(user_id=userid, login=login, password=password)
+            .values(user_id=userid, login=encrypttext(login), password=encrypttext(password))
         )
         await self.async_session.execute(stmt)
         await self.async_session.commit()
