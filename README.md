@@ -1,6 +1,5 @@
 # edu.tatar.ru telegram client
-
-И для этого я создал этот проект. 
+ 
 ## Установка
 ### Публичный инстанс:
 - [@edutatarclientbot](https://t.me/edutatarclientbot)
